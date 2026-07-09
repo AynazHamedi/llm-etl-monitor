@@ -198,18 +198,79 @@ If both checks pass, Phase 1 is complete and you're ready for Phase 2 (dataset p
 > Note: `completeness_after` is not 100% because `Cabin` is still mostly
 > missing — this is expected and by design, not a bug (see note above).
 
+**Layer 8.3 — Data Drift Detection** (`src/monitoring/drift_detection.py`)
+
+- Detects distribution drift between a **reference** batch and a **current**
+  batch at the ETL layer, before data reaches any downstream model (per
+  Section 8.3 of the proposal). Dataset-agnostic — works on any two DataFrames
+  with the same schema, so it is reused across all datasets.
+- Numeric columns: **Kolmogorov–Smirnov** test (+ **KL divergence** on
+  histograms). A column is flagged when the KS p-value < 0.05.
+- Categorical columns: **Population Stability Index (PSI)** + **Jensen–Shannon
+  divergence** on category frequencies. Flagged when PSI ≥ 0.2.
+- Logs drift metrics/artifacts to MLflow (experiment `etl_drift_detection`),
+  degrading gracefully when no tracking server is running.
+- Includes a `--demo` mode that simulates a drifted batch from a single
+  dataset (the "Simulation Test" evaluation method from Section 10), so drift
+  can be demonstrated without a second real batch.
+
+```bash
+# Compare two real batches:
+python -m src.monitoring.drift_detection \
+    --reference data/raw/titanic.csv --current data/processed/titanic_after_llm.csv
+
+# Self-contained demo (simulates drift on one dataset):
+python -m src.monitoring.drift_detection --demo data/raw/titanic.csv
+```
+
+- Verified: identical batches → 0 columns flagged (no false positives);
+  simulated drift → numeric and categorical columns correctly flagged.
+
+### Phase 2/3 — Second dataset: Adult Income (generalization)
+
+To prove the pipeline is not Titanic-specific, a **config-driven, generic
+runner** was added: `src/pipelines/run_pipeline.py`. It reads a dataset entry
+from `config/config.yaml` and runs the whole flow (ingest → profile → rule-based
+clean → metrics → drift detection → MLflow) for **any** dataset, so the same
+code now serves Titanic and Adult Income.
+
+```bash
+python -m src.pipelines.run_pipeline --dataset adult_income
+# add --no-mlflow to run without a tracking server
+```
+
+**Adult Income result** (UCI, 32,561 rows × 15 cols — main errors per the
+proposal: inconsistency, noise, duplicates):
+
+| Metric                 | Before   | After   |
+| ---------------------- | -------- | ------- |
+| Rows                   | 32,561   | 32,537  |
+| Completeness           | 99.13%   | 100.0%  |
+| Duplicate rate         | 0.074%   | 0.0%    |
+| DQIS score             |          | +0.88%  |
+
+- **24 exact duplicate rows removed** (matches the well-documented Adult
+  duplicate count).
+- Rule-based layer handled all three of Adult's error types deterministically:
+  whitespace **noise** (`" Bachelors"` → `"Bachelors"`), **inconsistency** via
+  `?` → NaN normalization, and **duplicates**.
+- `?` missing markers (1,836 in `workclass`, 1,843 in `occupation`, etc.)
+  imputed → 0 missing cells.
+- Drift across a 50/50 batch split: 0/15 columns flagged (expected on an IID
+  split — confirms no false positives on real data).
+
 ### Next steps (Phase 2 continued / Phase 6)
 
-1. Repeat the full pipeline (ingestion → profiling → validation → decision
-   engine → rule/LLM cleaning → reviewer → MLflow logging) for the 3
-   remaining datasets: **Adult Income**, **OpenML Dirty Tabular**, and the
-   **synthetic LLMClean-style dataset**.
+1. ~~Repeat the full pipeline for **Adult Income**~~ — **done** via the generic
+   `src/pipelines/run_pipeline.py` (see above). Remaining datasets:
+   **OpenML Dirty Tabular** and the **synthetic LLMClean-style dataset** — both
+   run with the same `--dataset` runner once their CSVs are placed in
+   `data/raw/` and given a config entry.
 2. Decide on and implement a strategy for the `Cabin` column (impute vs.
    binary `Has_Cabin` feature).
-3. Implement **Drift Detection** (Layer 8.3 of the proposal) — comparing
-   column distributions between batches (KS test / KL divergence) — this is
-   explicitly listed as one of the specific objectives and hasn't been
-   started yet.
+3. ~~Implement **Drift Detection** (Layer 8.3 of the proposal)~~ — **done**,
+   see `src/monitoring/drift_detection.py` above. Remaining: wire it into the
+   per-batch pipeline runs for the other datasets.
 4. Build the full multi-agent ReAct orchestration (Profiler/Cleaner/Reviewer
    as actual agents via LangChain or CrewAI) instead of sequential scripts.
 5. Produce the final evaluation report comparing Completeness, Consistency,
@@ -219,11 +280,12 @@ If both checks pass, Phase 1 is complete and you're ready for Phase 2 (dataset p
 ## Phase checklist
 
 - [x] Phase 1: Infrastructure setup
-- [~] Phase 2: Dataset preparation (Titanic done, 3 more datasets pending)
-- [~] Phase 3: Core ETL layer implementation (fully working for Titanic;
-  not yet applied to other datasets)
+- [~] Phase 2: Dataset preparation (Titanic + Adult Income done, 2 datasets
+  pending: OpenML Dirty, synthetic LLMClean)
+- [~] Phase 3: Core ETL layer implementation (Titanic per-dataset scripts +
+  generic config-driven runner working for Titanic and Adult Income)
 - [~] Phase 4: Multi-agent architecture (Cleaner + Reviewer logic implemented
   as scripts; full ReAct/LangChain orchestration pending)
 - [~] Phase 5: Monitoring and evaluation (MLflow logging working end-to-end
-  for Titanic; drift detection not yet implemented)
+  for Titanic; drift detection implemented — `src/monitoring/drift_detection.py`)
 - [ ] Phase 6: Final evaluation and report

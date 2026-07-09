@@ -43,6 +43,7 @@ datasets:
   adult_income:
     path: "data/raw/adult_income.csv"
     expected_main_errors: ["inconsistency", "noise", "duplicate"]
+    na_tokens: ["?"]          # Adult encodes missing values as "?"
   openml_dirty:
     path: "data/raw/openml_dirty.csv"
     expected_main_errors: ["schema_mismatch", "semantic_error"]
