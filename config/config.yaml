@@ -24,6 +24,17 @@ decision_engine:
   simple_error_types: ["missing_value", "duplicate", "type_mismatch", "format_error"]
   semantic_error_types: ["semantic_inconsistency", "schema_mismatch_semantic", "unstructured_text"]
   max_rows_per_llm_batch: 20
+  # Columns with unique-value ratio above this are treated as identifier-like
+  # (name/id/free text) and routed straight to the LLM/semantic path instead
+  # of rule-based mode imputation.
+  high_cardinality_ratio: 0.5
+
+# --- Agent Reviewer thresholds (Section 7.2 / 7.3 of the proposal) ---
+agents:
+  # Only LLM corrections at/above this confidence score are auto-applied.
+  score_confidence_threshold: 70
+  # Ollama generation timeout per row, in seconds.
+  llm_timeout_seconds: 30
 
 # --- Evaluation thresholds (per project spec) ---
 evaluation_thresholds:
@@ -43,6 +54,7 @@ datasets:
   adult_income:
     path: "data/raw/adult_income.csv"
     expected_main_errors: ["inconsistency", "noise", "duplicate"]
+    na_tokens: ["?"]          # Adult encodes missing values as "?"
   openml_dirty:
     path: "data/raw/openml_dirty.csv"
     expected_main_errors: ["schema_mismatch", "semantic_error"]
