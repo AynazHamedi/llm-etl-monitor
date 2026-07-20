@@ -5,7 +5,8 @@ Computes a baseline data-quality profile for an ingested DataFrame:
 - missing values per column (count + %)
 - duplicate row count
 - per-column dtype, unique value count
-- basic numeric stats (min/max/mean) for numeric columns
+- numeric stats (min/max/mean/std) and IQR outliers
+- exact and normalized/fuzzy duplicate candidates
 
 This profile is saved as JSON so it can later be compared against the
 profile of the cleaned dataset (Layer 6.9 - Evaluation).
@@ -43,12 +44,30 @@ def profile(df: pd.DataFrame) -> dict:
             col_info["min"] = float(df[col].min()) if df[col].notna().any() else None
             col_info["max"] = float(df[col].max()) if df[col].notna().any() else None
             col_info["mean"] = float(df[col].mean()) if df[col].notna().any() else None
+            col_info["std"] = float(df[col].std()) if df[col].notna().sum() > 1 else None
+            values = df[col].dropna()
+            if not values.empty:
+                q1, q3 = values.quantile([0.25, 0.75])
+                iqr = q3 - q1
+                lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+                col_info["outlier_count_iqr"] = int(((values < lower) | (values > upper)).sum())
+                col_info["outlier_lower_bound"] = float(lower)
+                col_info["outlier_upper_bound"] = float(upper)
         columns_report[col] = col_info
+
+    # A scalable fuzzy-duplicate candidate detector: normalize case,
+    # punctuation and whitespace before comparing complete rows. It catches
+    # common near-duplicates such as "John Smith" vs " john  smith ".
+    normalized = df.astype("string").fillna("").apply(
+        lambda s: s.str.lower().str.replace(r"[^\w]+", "", regex=True)
+    )
+    normalized_duplicate_mask = normalized.duplicated(keep=False)
 
     report = {
         "n_rows": n_rows,
         "n_columns": df.shape[1],
         "duplicate_rows": int(df.duplicated().sum()),
+        "fuzzy_duplicate_candidate_rows": int(normalized_duplicate_mask.sum()),
         "overall_missing_cells": int(missing.sum()),
         "overall_missing_pct": float((missing.sum() / (n_rows * df.shape[1]) * 100).round(2)),
         "columns": columns_report,

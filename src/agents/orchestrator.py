@@ -18,6 +18,8 @@ from decision_agent import DecisionAgent
 from cleaner_agent import CleanerAgent
 from reviewer_agent import ReviewerAgent
 from run_pipeline import ingest as generic_ingest, rule_based_clean, quality_metrics, load_config
+from validation.generic_validation import validate_dataframe
+from evaluation.ground_truth import verified_correction_rate
 
 
 def _completeness(df: pd.DataFrame) -> float:
@@ -104,7 +106,14 @@ def run_agentic_pipeline(dataset: str, cfg: dict, use_mlflow: bool = True,
                 df[d["column"]] = df[d["column"]].fillna(mode.iloc[0] if not mode.empty else "")
                 fallback_fill_counts[d["column"]] = n_missing
 
-    metrics = quality_metrics(raw, df, duplicates_removed)
+    validation_cfg = ds_cfg.get("validation", {})
+    validation_before = validate_dataframe(
+        raw, validation_cfg.get("required_columns", []),
+        validation_cfg.get("unique_columns", []), validation_cfg.get("regex_rules", {}))
+    validation_after = validate_dataframe(
+        df, validation_cfg.get("required_columns", []),
+        validation_cfg.get("unique_columns", []), validation_cfg.get("regex_rules", {}))
+    metrics = quality_metrics(raw, df, duplicates_removed, validation_before, validation_after)
 
     error_correction_rate = (
         100.0 * accepted / total_semantic_errors if total_semantic_errors else None
@@ -120,6 +129,16 @@ def run_agentic_pipeline(dataset: str, cfg: dict, use_mlflow: bool = True,
     metrics["semantic_errors_sent_to_llm"] = len(review_results)
     metrics["error_correction_rate"] = error_correction_rate
     metrics["llm_batch_acceptance_rate"] = llm_batch_acceptance_rate
+    latencies = [r.get("latency_seconds") for r in review_results if r.get("latency_seconds") is not None]
+    metrics["llm_latency_mean_seconds_per_row"] = (
+        sum(latencies) / len(latencies) if latencies else None
+    )
+    metrics["llm_latency_max_seconds_per_row"] = max(latencies) if latencies else None
+    metrics["llm_backend"] = "ollama" if is_real_ollama else "mock"
+    metrics["results_are_evaluation_valid"] = bool(is_real_ollama)
+    metrics["error_correction_rate_verified"] = verified_correction_rate(
+        review_results, ds_cfg.get("ground_truth_path"))
+    metrics["error_correction_rate_proxy"] = error_correction_rate
 
     os.makedirs("reports", exist_ok=True)
     os.makedirs("data/processed", exist_ok=True)
@@ -130,12 +149,16 @@ def run_agentic_pipeline(dataset: str, cfg: dict, use_mlflow: bool = True,
         "review": f"reports/{dataset}_agentic_review.json",
         "trace": f"reports/{dataset}_agentic_trace.json",
         "metrics": f"reports/{dataset}_agentic_metrics.json",
+        "validation_before": f"reports/{dataset}_agentic_validation_before.json",
+        "validation_after": f"reports/{dataset}_agentic_validation_after.json",
         "processed": f"data/processed/{dataset}_agentic_cleaned.csv",
     }
     profile_report.pop("_flagged_columns", None)
     for key, obj in (("profile", profile_report), ("decisions", decisions),
                      ("suggestions", suggestions), ("review", review_results),
-                     ("trace", full_trace), ("metrics", metrics)):
+                     ("trace", full_trace), ("metrics", metrics),
+                     ("validation_before", validation_before),
+                     ("validation_after", validation_after)):
         with open(paths[key], "w", encoding="utf-8") as f:
             json.dump(obj, f, indent=2, ensure_ascii=False, default=str)
     df.to_csv(paths["processed"], index=False)

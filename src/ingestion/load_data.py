@@ -1,7 +1,7 @@
 """
 Layer 6.1 - Data Ingestion
 
-Loads a raw CSV file and applies minimal, lossless standardization:
+Loads a raw CSV/Excel file and applies minimal, lossless standardization:
 - normalizes column names (lowercase, strip spaces)
 - infers a reasonable dtype per column
 - reports basic shape/info
@@ -13,8 +13,12 @@ RAW_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw", "t
 
 
 def load_raw(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    return df
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".csv":
+        return pd.read_csv(path)
+    if ext in {".xlsx", ".xls"}:
+        return pd.read_excel(path)
+    raise ValueError(f"Unsupported input format '{ext}'. Use CSV, XLSX, or XLS.")
 
 
 def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:

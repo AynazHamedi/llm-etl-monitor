@@ -33,8 +33,16 @@ import yaml
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from profiling.profile_data import profile  # noqa: E402
 from monitoring.drift_detection import detect_drift, save_report as save_drift_report  # noqa: E402
+from validation.generic_validation import validate_dataframe  # noqa: E402
+from transformation.schema_matching import apply_schema_mapping  # noqa: E402
 
 DEFAULT_NA_TOKENS = ["?", "NA", "N/A", "null", "None", "", "-"]
+COMMON_SCHEMA = {
+    "email": ["e_mail", "email_address", "e_mail_address"],
+    "phone": ["phone_number", "telephone", "mobile"],
+    "customer_id": ["customerid", "cust_id", "client_id"],
+    "employee_id": ["employeeid", "emp_id", "staff_id"],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -49,8 +57,15 @@ def load_config(path: str = "config/config.yaml") -> dict:
 # Layer 6.1 - Ingestion (generic)
 # ---------------------------------------------------------------------------
 def ingest(path: str, na_tokens: List[str]) -> pd.DataFrame:
-    df = pd.read_csv(path)
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".csv":
+        df = pd.read_csv(path)
+    elif ext in {".xlsx", ".xls"}:
+        df = pd.read_excel(path)
+    else:
+        raise ValueError(f"Unsupported input format '{ext}'. Use CSV, XLSX, or XLS.")
     df.columns = [c.strip() for c in df.columns]
+    df, _ = apply_schema_mapping(df, COMMON_SCHEMA)
     # Trim surrounding whitespace on every string cell (fixes "noise" like
     # " Bachelors" -> "Bachelors") *before* deciding what counts as missing.
     for c in df.columns:
@@ -106,18 +121,25 @@ def _completeness(df: pd.DataFrame) -> float:
     return 100.0 * (1 - df.isna().sum().sum() / total) if total else 100.0
 
 
-def quality_metrics(before: pd.DataFrame, after: pd.DataFrame, dups_removed: int) -> Dict:
+def quality_metrics(before: pd.DataFrame, after: pd.DataFrame, dups_removed: int,
+                    validation_before: Dict | None = None,
+                    validation_after: Dict | None = None) -> Dict:
     comp_before = _completeness(before)
     comp_after = _completeness(after)
     dqis = 100.0 * (comp_after - comp_before) / comp_before if comp_before else 0.0
     dup_rate_before = 100.0 * dups_removed / len(before) if len(before) else 0.0
-    return {
+    result = {
         "completeness_before": round(comp_before, 4),
         "completeness_after": round(comp_after, 4),
         "dqis_score": round(dqis, 4),
         "duplicate_rate_before": round(dup_rate_before, 4),
         "duplicate_rate_after": round(100.0 * after.duplicated().sum() / len(after), 4) if len(after) else 0.0,
     }
+    if validation_before is not None:
+        result["consistency_before"] = validation_before["consistency_score"]
+    if validation_after is not None:
+        result["consistency_after"] = validation_after["consistency_score"]
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -162,9 +184,23 @@ def run(dataset: str, cfg: dict, use_mlflow: bool = True) -> Dict:
     print(f"Ingested: {raw.shape[0]} rows x {raw.shape[1]} cols")
 
     profile_before = profile(raw)
+    validation_cfg = ds_cfg.get("validation", {})
+    validation_before = validate_dataframe(
+        raw,
+        required_columns=validation_cfg.get("required_columns", []),
+        unique_columns=validation_cfg.get("unique_columns", []),
+        regex_rules=validation_cfg.get("regex_rules", {}),
+    )
     cleaned, clean_log = rule_based_clean(raw)
     profile_after = profile(cleaned)
-    metrics = quality_metrics(raw, cleaned, clean_log["duplicates_removed"])
+    validation_after = validate_dataframe(
+        cleaned,
+        required_columns=validation_cfg.get("required_columns", []),
+        unique_columns=validation_cfg.get("unique_columns", []),
+        regex_rules=validation_cfg.get("regex_rules", {}),
+    )
+    metrics = quality_metrics(raw, cleaned, clean_log["duplicates_removed"],
+                              validation_before, validation_after)
 
     # Drift detection (Layer 8.3): treat the data as two sequential batches
     # (first half = reference, second half = current) — the runtime-monitoring
@@ -180,11 +216,15 @@ def run(dataset: str, cfg: dict, use_mlflow: bool = True) -> Dict:
         "profile_after": f"reports/{dataset}_profile_after.json",
         "clean_log": f"reports/{dataset}_clean_log.json",
         "metrics": f"reports/{dataset}_metrics.json",
+        "validation_before": f"reports/{dataset}_validation_before.json",
+        "validation_after": f"reports/{dataset}_validation_after.json",
         "drift": f"reports/{dataset}_drift_report.json",
         "processed": f"data/processed/{dataset}_cleaned.csv",
     }
     for key, obj in (("profile_before", profile_before), ("profile_after", profile_after),
-                     ("clean_log", clean_log), ("metrics", metrics)):
+                     ("clean_log", clean_log), ("metrics", metrics),
+                     ("validation_before", validation_before),
+                     ("validation_after", validation_after)):
         with open(paths[key], "w", encoding="utf-8") as f:
             json.dump(obj, f, indent=2, ensure_ascii=False)
     save_drift_report(drift, paths["drift"])
@@ -194,12 +234,14 @@ def run(dataset: str, cfg: dict, use_mlflow: bool = True) -> Dict:
     print(f"Completeness:         {metrics['completeness_before']}% -> {metrics['completeness_after']}%")
     print(f"DQIS score:           {metrics['dqis_score']}%")
     print(f"Duplicate rate:       {metrics['duplicate_rate_before']}% -> {metrics['duplicate_rate_after']}%")
+    print(f"Consistency:          {metrics['consistency_before']}% -> {metrics['consistency_after']}%")
     print(f"Drift (batch split):  {drift['columns_drifted']}/{drift['columns_checked']} columns -> {drift['drifted_columns']}")
     print(f"Artifacts saved under reports/ and data/processed/")
 
     if use_mlflow:
         log_to_mlflow(dataset, metrics, drift, cfg,
-                      [paths["metrics"], paths["drift"], paths["clean_log"], paths["processed"]])
+                      [paths["metrics"], paths["drift"], paths["clean_log"],
+                       paths["validation_before"], paths["validation_after"], paths["processed"]])
 
     return {"metrics": metrics, "drift": drift, "clean_log": clean_log, "paths": paths}
 

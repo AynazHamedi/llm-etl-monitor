@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -89,7 +90,9 @@ class CleanerAgent:
             for idx in missing_idx:
                 prompt = _build_prompt(df, idx, col, allowed_values)
                 try:
+                    started = time.perf_counter()
                     raw = self.llm_client.generate(prompt)
+                    latency_seconds = time.perf_counter() - started
                 except Exception as exc:  # network / server errors -> degrade gracefully
                     trace.append({"agent": self.name, "observation": f"LLM call failed for row {idx}: {exc}"})
                     continue
@@ -101,6 +104,7 @@ class CleanerAgent:
                     "raw_response": raw.strip()[:300],
                     "suggested_value": value,
                     "confidence": confidence,
+                    "latency_seconds": round(latency_seconds, 6),
                     "allowed_values": allowed_values,
                 })
 

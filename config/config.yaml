@@ -51,13 +51,23 @@ datasets:
   titanic:
     path: "data/raw/titanic.csv"
     expected_main_errors: ["missing_value", "type_mismatch"]
+    validation:
+      required_columns: ["PassengerId", "Pclass", "Sex"]
+      unique_columns: ["PassengerId"]
   adult_income:
     path: "data/raw/adult_income.csv"
     expected_main_errors: ["inconsistency", "noise", "duplicate"]
     na_tokens: ["?"]          # Adult encodes missing values as "?"
+    validation:
+      required_columns: ["age", "workclass", "occupation"]
   openml_dirty:
     path: "data/raw/openml_dirty.csv"
     expected_main_errors: ["schema_mismatch", "semantic_error"]
+    validation:
+      required_columns: ["employee_id", "age", "department"]
+      unique_columns: ["employee_id"]
   synthetic_llmclean:
     path: "data/raw/synthetic_llmclean.csv"
     expected_main_errors: ["semantic_error", "mixed_format"]
+    validation:
+      required_columns: ["customer_name", "product_category", "quantity"]

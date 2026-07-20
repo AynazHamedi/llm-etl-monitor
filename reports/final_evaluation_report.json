@@ -12,8 +12,12 @@
     {
       "dataset": "titanic",
       "completeness_pct": 100.0,
+      "consistency_pct": null,
       "duplicate_rate_pct": 0.0,
-      "error_correction_rate_pct": 14.513788098693759,
+      "llm_latency_seconds_per_row": null,
+      "llm_backend": "mock (legacy report)",
+      "evaluation_valid": false,
+      "error_correction_rate_pct": null,
       "llm_batch_acceptance_rate_pct": 98.03921568627452,
       "semantic_errors_total": 689,
       "semantic_errors_sent_to_llm": 102,
@@ -32,8 +36,10 @@
       ],
       "checks": {
         "completeness_ge_threshold": true,
+        "consistency_ge_threshold": null,
         "duplicate_rate_le_threshold": true,
-        "error_correction_rate_ge_threshold": false,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": null,
         "log_coverage_ge_threshold": true,
         "drift_delay_le_threshold": true
       }
@@ -41,8 +47,12 @@
     {
       "dataset": "adult_income",
       "completeness_pct": 100.0,
+      "consistency_pct": null,
       "duplicate_rate_pct": 0.0,
-      "error_correction_rate_pct": 6.383478056794179,
+      "llm_latency_seconds_per_row": null,
+      "llm_backend": "mock (legacy report)",
+      "evaluation_valid": false,
+      "error_correction_rate_pct": null,
       "llm_batch_acceptance_rate_pct": 90.66666666666667,
       "semantic_errors_total": 4261,
       "semantic_errors_sent_to_llm": 300,
@@ -64,8 +74,10 @@
       ],
       "checks": {
         "completeness_ge_threshold": true,
+        "consistency_ge_threshold": null,
         "duplicate_rate_le_threshold": true,
-        "error_correction_rate_ge_threshold": false,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": null,
         "log_coverage_ge_threshold": true,
         "drift_delay_le_threshold": true
       }
@@ -73,8 +85,12 @@
     {
       "dataset": "openml_dirty",
       "completeness_pct": 100.0,
+      "consistency_pct": null,
       "duplicate_rate_pct": 0.0,
-      "error_correction_rate_pct": 98.33333333333333,
+      "llm_latency_seconds_per_row": null,
+      "llm_backend": "mock (legacy report)",
+      "evaluation_valid": false,
+      "error_correction_rate_pct": null,
       "llm_batch_acceptance_rate_pct": 98.33333333333333,
       "semantic_errors_total": 60,
       "semantic_errors_sent_to_llm": 60,
@@ -92,8 +108,10 @@
       ],
       "checks": {
         "completeness_ge_threshold": true,
+        "consistency_ge_threshold": null,
         "duplicate_rate_le_threshold": true,
-        "error_correction_rate_ge_threshold": true,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": null,
         "log_coverage_ge_threshold": true,
         "drift_delay_le_threshold": true
       }
@@ -101,8 +119,12 @@
     {
       "dataset": "synthetic_llmclean",
       "completeness_pct": 100.0,
+      "consistency_pct": null,
       "duplicate_rate_pct": 0.0,
-      "error_correction_rate_pct": 100.0,
+      "llm_latency_seconds_per_row": null,
+      "llm_backend": "mock (legacy report)",
+      "evaluation_valid": false,
+      "error_correction_rate_pct": null,
       "llm_batch_acceptance_rate_pct": 100.0,
       "semantic_errors_total": 20,
       "semantic_errors_sent_to_llm": 20,
@@ -118,8 +140,10 @@
       ],
       "checks": {
         "completeness_ge_threshold": true,
+        "consistency_ge_threshold": null,
         "duplicate_rate_le_threshold": true,
-        "error_correction_rate_ge_threshold": true,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": null,
         "log_coverage_ge_threshold": true,
         "drift_delay_le_threshold": true
       }

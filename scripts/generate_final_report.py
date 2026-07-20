@@ -30,6 +30,7 @@ REPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "reports")
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "config.yaml")
 OUT_MD = os.path.join(REPORTS_DIR, "final_evaluation_report.md")
 OUT_JSON = os.path.join(REPORTS_DIR, "final_evaluation_report.json")
+OUT_HTML = os.path.join(REPORTS_DIR, "final_evaluation_report.html")
 
 
 def _load_json(path):
@@ -60,12 +61,16 @@ def build_report():
         review = _load_json(os.path.join(REPORTS_DIR, f"{ds}_agentic_review.json"))
 
         completeness_after = agentic_metrics.get("completeness_after", metrics.get("completeness_after"))
+        consistency_after = agentic_metrics.get("consistency_after", metrics.get("consistency_after"))
         duplicate_rate_after = metrics.get("duplicate_rate_after")
+        llm_latency = agentic_metrics.get("llm_latency_mean_seconds_per_row")
+        llm_backend = agentic_metrics.get("llm_backend", "mock (legacy report)")
+        evaluation_valid = agentic_metrics.get("results_are_evaluation_valid", False)
 
         # --- Error Correction Rate: proposal's Section 10.1 formula
         # (LLM-corrected / TOTAL semantic errors identified), read directly
         # from what orchestrator.py already computed and stored. ---
-        error_correction_rate = agentic_metrics.get("error_correction_rate")
+        error_correction_rate = agentic_metrics.get("error_correction_rate_verified")
 
         # Secondary, non-proposal metric kept for transparency: acceptance
         # rate ONLY among rows actually sent to the LLM (i.e. excludes the
@@ -87,7 +92,11 @@ def build_report():
         row = {
             "dataset": ds,
             "completeness_pct": completeness_after,
+            "consistency_pct": consistency_after,
             "duplicate_rate_pct": duplicate_rate_after,
+            "llm_latency_seconds_per_row": llm_latency,
+            "llm_backend": llm_backend,
+            "evaluation_valid": evaluation_valid,
             "error_correction_rate_pct": error_correction_rate,
             "llm_batch_acceptance_rate_pct": llm_batch_acceptance_rate,
             "semantic_errors_total": semantic_errors_total,
@@ -98,10 +107,14 @@ def build_report():
             "checks": {
                 "completeness_ge_threshold": _check(completeness_after, "ge",
                                                     thresholds.get("completeness_min_percent")),
+                "consistency_ge_threshold": _check(consistency_after, "ge",
+                                                    thresholds.get("consistency_min_percent")),
                 "duplicate_rate_le_threshold": _check(duplicate_rate_after, "le",
                                                       thresholds.get("duplicate_rate_max_percent")),
                 "error_correction_rate_ge_threshold": _check(error_correction_rate, "ge",
                                                              thresholds.get("correction_error_rate_min_percent")),
+                "llm_latency_le_threshold": _check(llm_latency, "le",
+                                                    thresholds.get("llm_latency_max_seconds_per_row")),
                 "log_coverage_ge_threshold": _check(log_coverage, "ge",
                                                     thresholds.get("log_coverage_percent")),
                 "drift_delay_le_threshold": drift_delay_batches <= thresholds.get(
@@ -115,6 +128,7 @@ def build_report():
         json.dump(report, f, indent=2, ensure_ascii=False)
 
     _write_markdown(report)
+    _write_html(report)
     return report
 
 
@@ -154,18 +168,18 @@ def _write_markdown(report):
     lines.append(f"| Drift Detection Delay | < {th.get('drift_detection_delay_max_batches')} batch |\n")
 
     lines.append("## Per-dataset results\n")
-    lines.append("| Dataset | Completeness | Dup. Rate | Correction Rate (proposal formula) | LLM Batch Acceptance | Log Coverage | Drift Flagged |")
-    lines.append("|---|---|---|---|---|---|---|")
+    lines.append("| Dataset | Backend | Completeness | Consistency | Dup. Rate | LLM Latency | Verified Correction Rate | Log Coverage |")
+    lines.append("|---|---|---|---|---|---|---|---|")
     for row in report["datasets"]:
         c = row["checks"]
         lines.append(
-            f"| {row['dataset']} "
+            f"| {row['dataset']} | {row['llm_backend']} "
             f"| {_fmt(row['completeness_pct'], '%')} ({_mark(c['completeness_ge_threshold'])}) "
+            f"| {_fmt(row['consistency_pct'], '%')} ({_mark(c['consistency_ge_threshold'])}) "
             f"| {_fmt(row['duplicate_rate_pct'], '%')} ({_mark(c['duplicate_rate_le_threshold'])}) "
+            f"| {_fmt(row['llm_latency_seconds_per_row'], 's')} ({_mark(c['llm_latency_le_threshold'])}) "
             f"| {_fmt(row['error_correction_rate_pct'], '%')} ({_mark(c['error_correction_rate_ge_threshold'])}) "
-            f"| {_fmt(row['llm_batch_acceptance_rate_pct'], '%')} "
-            f"| {_fmt(row['log_coverage_pct'], '%')} ({_mark(c['log_coverage_ge_threshold'])}) "
-            f"| {row.get('drift_columns') or 'none'} |"
+            f"| {_fmt(row['log_coverage_pct'], '%')} ({_mark(c['log_coverage_ge_threshold'])}) |"
         )
 
     lines.append("\n## Notes on Error Correction Rate vs. LLM Batch Acceptance Rate\n")
@@ -181,16 +195,39 @@ def _write_markdown(report):
                  "datasets where every missing value fit within the batch cap "
                  "(openml_dirty, synthetic_llmclean).\n")
 
-    lines.append("> Note: LLM Latency and Consistency Score are not computed here because they need a live ")
-    lines.append("Ollama run and Great-Expectations-style rule validation respectively - see README 'Next steps'.\n")
+    lines.append("> Mock runs are plumbing tests only. Verified correction rate remains n/a until ")
+    lines.append("a real Ollama run is compared with manually annotated ground truth.\n")
 
     with open(OUT_MD, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
+def _write_html(report):
+    rows = []
+    for row in report["datasets"]:
+        c = row["checks"]
+        rows.append(
+            "<tr>" + "".join(f"<td>{v}</td>" for v in [
+                row["dataset"], row["llm_backend"],
+                _fmt(row["completeness_pct"], "%"), _mark(c["completeness_ge_threshold"]),
+                _fmt(row["consistency_pct"], "%"), _mark(c["consistency_ge_threshold"]),
+                _fmt(row["duplicate_rate_pct"], "%"),
+                _fmt(row["llm_latency_seconds_per_row"], "s"),
+                _fmt(row["error_correction_rate_pct"], "%"),
+            ]) + "</tr>"
+        )
+    html = """<!doctype html><html><head><meta charset='utf-8'><title>ETL Evaluation</title>
+<style>body{font-family:Arial,sans-serif;margin:36px;color:#1f2937}h1{color:#17365d}table{border-collapse:collapse;width:100%}th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}th{background:#17365d;color:white}tr:nth-child(even){background:#f1f5f9}.note{margin-top:18px;padding:12px;background:#fff7ed;border-left:4px solid #f97316}</style></head><body>
+<h1>LLM-based Intelligent ETL Monitor</h1><h2>Final Evaluation Report</h2>
+<table><thead><tr><th>Dataset</th><th>Backend</th><th>Completeness</th><th>Check</th><th>Consistency</th><th>Check</th><th>Duplicate Rate</th><th>Latency/row</th><th>Verified Correction</th></tr></thead><tbody>""" + "".join(rows) + """</tbody></table>
+<div class='note'><b>Integrity note:</b> Mock results validate pipeline wiring only. Accuracy claims require a real Ollama run and manually annotated ground truth.</div></body></html>"""
+    with open(OUT_HTML, "w", encoding="utf-8") as f:
+        f.write(html)
+
+
 if __name__ == "__main__":
     report = build_report()
-    print(f"Final report written to:\n  {OUT_JSON}\n  {OUT_MD}")
+    print(f"Final report written to:\n  {OUT_JSON}\n  {OUT_MD}\n  {OUT_HTML}")
     for row in report["datasets"]:
         print(f"{row['dataset']:20s} completeness={_fmt(row['completeness_pct'], '%'):>8s} "
               f"dup_rate={_fmt(row['duplicate_rate_pct'], '%'):>7s} "
