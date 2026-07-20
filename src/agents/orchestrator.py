@@ -44,7 +44,8 @@ def run_agentic_pipeline(dataset: str, cfg: dict, use_mlflow: bool = True,
     print(f"[{profiler.name}] flagged columns: {profile_report['_flagged_columns']}")
 
     decision_agent = DecisionAgent(
-        high_cardinality_ratio=cfg.get("decision_engine", {}).get("high_cardinality_ratio", 0.5)
+        high_cardinality_ratio=cfg.get("decision_engine", {}).get("high_cardinality_ratio", 0.5),
+        high_missing_ratio=cfg.get("decision_engine", {}).get("high_missing_ratio", 0.5),
     )
     decisions, trace = decision_agent.run(raw, profile_report)
     full_trace += trace
@@ -52,14 +53,18 @@ def run_agentic_pipeline(dataset: str, cfg: dict, use_mlflow: bool = True,
         print(f"[{decision_agent.name}] {d['column']} -> {d['route']}:{d['action']} ({d['reason']})")
 
     df = raw.copy()
-    rule_cols = [d["column"] for d in decisions if d["route"] == "rule"]
+    rule_decisions = [d for d in decisions if d["route"] == "rule"]
     dup_mask = df.duplicated(keep="first")
     duplicates_removed = int(dup_mask.sum())
     df = df[~dup_mask].reset_index(drop=True)
-    for col in rule_cols:
+    for decision in rule_decisions:
+        col = decision["column"]
         if col not in df.columns or df[col].isna().sum() == 0:
             continue
-        if pd.api.types.is_numeric_dtype(df[col]):
+        if decision["action"] == "missing_indicator":
+            df[f"{col}__was_missing"] = df[col].isna().astype(int)
+            df[col] = df[col].fillna("UNKNOWN")
+        elif pd.api.types.is_numeric_dtype(df[col]):
             df[col] = df[col].fillna(df[col].median())
         else:
             mode = df[col].mode(dropna=True)

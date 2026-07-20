@@ -28,6 +28,8 @@ decision_engine:
   # (name/id/free text) and routed straight to the LLM/semantic path instead
   # of rule-based mode imputation.
   high_cardinality_ratio: 0.5
+  # Very sparse categorical columns are not safe LLM-imputation targets.
+  high_missing_ratio: 0.5
 
 # --- Agent Reviewer thresholds (Section 7.2 / 7.3 of the proposal) ---
 agents:
@@ -52,7 +54,7 @@ datasets:
     path: "data/raw/titanic.csv"
     expected_main_errors: ["missing_value", "type_mismatch"]
     validation:
-      required_columns: ["PassengerId", "Pclass", "Sex"]
+      required_columns: ["PassengerId", "Pclass", "Sex", "Age", "Embarked"]
       unique_columns: ["PassengerId"]
   adult_income:
     path: "data/raw/adult_income.csv"

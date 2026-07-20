@@ -1,0 +1,118 @@
+{
+  "thresholds": {
+    "completeness_min_percent": 95,
+    "consistency_min_percent": 90,
+    "duplicate_rate_max_percent": 1,
+    "llm_latency_max_seconds_per_row": 5,
+    "correction_error_rate_min_percent": 80,
+    "log_coverage_percent": 100,
+    "drift_detection_delay_max_batches": 1
+  },
+  "datasets": [
+    {
+      "dataset": "titanic",
+      "completeness_pct": 100.0,
+      "consistency_pct": 100.0,
+      "duplicate_rate_pct": 0.0,
+      "llm_latency_seconds_per_row": 3.0951265,
+      "llm_backend": "ollama",
+      "evaluation_valid": true,
+      "error_correction_rate_pct": null,
+      "llm_batch_acceptance_rate_pct": 100.0,
+      "semantic_errors_total": 2,
+      "semantic_errors_sent_to_llm": 2,
+      "log_coverage_pct": 100.0,
+      "drift_detected": true,
+      "drift_columns": [
+        "PassengerId",
+        "Cabin"
+      ],
+      "checks": {
+        "completeness_ge_threshold": true,
+        "consistency_ge_threshold": true,
+        "duplicate_rate_le_threshold": true,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": true,
+        "log_coverage_ge_threshold": true,
+        "drift_delay_le_threshold": true
+      }
+    },
+    {
+      "dataset": "adult_income",
+      "completeness_pct": 100.0,
+      "consistency_pct": 100.0,
+      "duplicate_rate_pct": 0.002,
+      "llm_latency_seconds_per_row": 3.1529606833333315,
+      "llm_backend": "ollama",
+      "evaluation_valid": true,
+      "error_correction_rate_pct": null,
+      "llm_batch_acceptance_rate_pct": 90.0,
+      "semantic_errors_total": 6456,
+      "semantic_errors_sent_to_llm": 300,
+      "log_coverage_pct": 100.0,
+      "drift_detected": false,
+      "drift_columns": [],
+      "checks": {
+        "completeness_ge_threshold": true,
+        "consistency_ge_threshold": true,
+        "duplicate_rate_le_threshold": true,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": true,
+        "log_coverage_ge_threshold": true,
+        "drift_delay_le_threshold": true
+      }
+    },
+    {
+      "dataset": "openml_dirty",
+      "completeness_pct": 100.0,
+      "consistency_pct": 88.3175,
+      "duplicate_rate_pct": 0.0,
+      "llm_latency_seconds_per_row": 3.0847486999999996,
+      "llm_backend": "ollama",
+      "evaluation_valid": true,
+      "error_correction_rate_pct": null,
+      "llm_batch_acceptance_rate_pct": 100.0,
+      "semantic_errors_total": 60,
+      "semantic_errors_sent_to_llm": 60,
+      "log_coverage_pct": 100.0,
+      "drift_detected": false,
+      "drift_columns": [],
+      "checks": {
+        "completeness_ge_threshold": true,
+        "consistency_ge_threshold": false,
+        "duplicate_rate_le_threshold": true,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": true,
+        "log_coverage_ge_threshold": true,
+        "drift_delay_le_threshold": true
+      }
+    },
+    {
+      "dataset": "synthetic_llmclean",
+      "completeness_pct": 100.0,
+      "consistency_pct": 79.6,
+      "duplicate_rate_pct": 0.0,
+      "llm_latency_seconds_per_row": 3.2502723,
+      "llm_backend": "ollama",
+      "evaluation_valid": true,
+      "error_correction_rate_pct": null,
+      "llm_batch_acceptance_rate_pct": 100.0,
+      "semantic_errors_total": 20,
+      "semantic_errors_sent_to_llm": 20,
+      "log_coverage_pct": 100.0,
+      "drift_detected": true,
+      "drift_columns": [
+        "customer_name"
+      ],
+      "checks": {
+        "completeness_ge_threshold": true,
+        "consistency_ge_threshold": false,
+        "duplicate_rate_le_threshold": true,
+        "error_correction_rate_ge_threshold": null,
+        "llm_latency_le_threshold": true,
+        "log_coverage_ge_threshold": true,
+        "drift_delay_le_threshold": true
+      }
+    }
+  ]
+}

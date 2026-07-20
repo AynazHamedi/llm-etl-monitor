@@ -25,8 +25,10 @@ import pandas as pd
 class DecisionAgent:
     name = "Engine Decision"
 
-    def __init__(self, high_cardinality_ratio: float = 0.5):
+    def __init__(self, high_cardinality_ratio: float = 0.5,
+                 high_missing_ratio: float = 0.5):
         self.high_cardinality_ratio = high_cardinality_ratio
+        self.high_missing_ratio = high_missing_ratio
 
     def run(self, df: pd.DataFrame, profiler_report: Dict) -> Tuple[List[Dict], List[Dict]]:
         trace: List[Dict] = []
@@ -42,12 +44,18 @@ class DecisionAgent:
         n_rows = len(df) or 1
         for col in flagged:
             missing = int(df[col].isna().sum())
+            missing_ratio = missing / n_rows
             if pd.api.types.is_numeric_dtype(df[col]):
                 route, action = "rule", "impute_median"
                 reason = "numeric column -> deterministic median imputation"
             else:
                 cardinality_ratio = df[col].nunique(dropna=True) / n_rows
-                if cardinality_ratio <= self.high_cardinality_ratio:
+                if missing_ratio >= self.high_missing_ratio:
+                    route, action = "rule", "missing_indicator"
+                    reason = (f"categorical, high missing ratio "
+                              f"({missing_ratio:.3f} >= {self.high_missing_ratio}) "
+                              f"-> preserve missingness as UNKNOWN + indicator")
+                elif cardinality_ratio <= self.high_cardinality_ratio:
                     route, action = "llm", "semantic_impute"
                     reason = (f"categorical, low cardinality ratio "
                               f"({cardinality_ratio:.3f} <= {self.high_cardinality_ratio}) "
@@ -61,6 +69,7 @@ class DecisionAgent:
             decisions.append({
                 "column": col,
                 "missing_count": missing,
+                "missing_ratio": missing_ratio,
                 "route": route,
                 "action": action,
                 "reason": reason,

@@ -1,4 +1,3 @@
-"""Run the complete reproducible evaluation for every configured dataset."""
 from __future__ import annotations
 
 import argparse

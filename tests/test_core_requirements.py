@@ -9,6 +9,7 @@ from src.profiling.profile_data import profile
 from src.transformation.schema_matching import apply_schema_mapping
 from src.validation.generic_validation import validate_dataframe
 from src.evaluation.ground_truth import verified_correction_rate
+from src.agents.decision_agent import DecisionAgent
 
 
 class CoreRequirementsTests(unittest.TestCase):
@@ -58,6 +59,13 @@ class CoreRequirementsTests(unittest.TestCase):
             path.write_text("row_index,column,expected_value\n1,status,OK\n", encoding="utf-8")
             reviews = [{"row_index": 1, "column": "status", "suggested_value": "OK", "accepted": True}]
             self.assertEqual(verified_correction_rate(reviews, str(path)), 100.0)
+
+    def test_sparse_categorical_column_is_not_sent_to_llm(self):
+        frame = pd.DataFrame({"cabin": [None, None, None, "C85"]})
+        report = {"_flagged_columns": ["cabin"]}
+        decisions, _ = DecisionAgent(high_missing_ratio=0.5).run(frame, report)
+        self.assertEqual(decisions[0]["route"], "rule")
+        self.assertEqual(decisions[0]["action"], "missing_indicator")
 
 
 if __name__ == "__main__":

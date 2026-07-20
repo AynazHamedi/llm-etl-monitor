@@ -27,12 +27,14 @@ import os
 import yaml
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "reports")
+FINAL_REPORTS_DIR = os.path.join(REPORTS_DIR, "final")
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "config.yaml")
-OUT_MD = os.path.join(REPORTS_DIR, "final_evaluation_report.md")
-OUT_JSON = os.path.join(REPORTS_DIR, "final_evaluation_report.json")
-OUT_HTML = os.path.join(REPORTS_DIR, "final_evaluation_report.html")
 
+os.makedirs(FINAL_REPORTS_DIR, exist_ok=True)
 
+OUT_MD = os.path.join(FINAL_REPORTS_DIR, "final_evaluation_report.md")
+OUT_JSON = os.path.join(FINAL_REPORTS_DIR, "final_evaluation_report.json")
+OUT_HTML = os.path.join(FINAL_REPORTS_DIR, "final_evaluation_report.html")
 def _load_json(path):
     if not os.path.exists(path):
         return None
