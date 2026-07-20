@@ -1,4 +1,3 @@
-# Setup script for Ollama + local LLM model (Windows PowerShell)
 # Run: .\scripts\setup_ollama.ps1
 
 Write-Host ">>> Checking if Ollama is installed..."
@@ -28,7 +27,6 @@ Write-Host ">>> Pulling model: mistral:latest ..."
 ollama pull mistral:latest
 
 Write-Host ">>> (Optional) Pulling alternative model llama3:8b ..."
-# ollama pull llama3:8b
 
 Write-Host ">>> Quick test..."
 ollama run mistral:latest "Reply with just: OK"

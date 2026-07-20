@@ -1,18 +1,4 @@
-"""
-Layer 6.2 - Data Profiling
 
-Computes a baseline data-quality profile for an ingested DataFrame:
-- missing values per column (count + %)
-- duplicate row count
-- per-column dtype, unique value count
-- numeric stats (min/max/mean/std) and IQR outliers
-- exact and normalized/fuzzy duplicate candidates
-
-This profile is saved as JSON so it can later be compared against the
-profile of the cleaned dataset (Layer 6.9 - Evaluation).
-
-Run: python src/profiling/profile_data.py
-"""
 import json
 import os
 import sys
@@ -20,7 +6,7 @@ import sys
 import pandas as pd
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "ingestion"))
-from load_data import ingest  # noqa: E402
+from load_data import ingest
 
 RAW_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw", "titanic.csv")
 REPORT_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "titanic_profile_before.json")
@@ -55,9 +41,7 @@ def profile(df: pd.DataFrame) -> dict:
                 col_info["outlier_upper_bound"] = float(upper)
         columns_report[col] = col_info
 
-    # A scalable fuzzy-duplicate candidate detector: normalize case,
-    # punctuation and whitespace before comparing complete rows. It catches
-    # common near-duplicates such as "John Smith" vs " john  smith ".
+
     normalized = df.astype("string").fillna("").apply(
         lambda s: s.str.lower().str.replace(r"[^\w]+", "", regex=True)
     )

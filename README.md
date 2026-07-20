@@ -209,6 +209,3 @@ python -m unittest discover -s tests -v
 
 The tests cover data ingestion, rule-based cleaning, profiling, validation, schema matching, and ground-truth evaluation.
 
-## Current Status
-
-The main ETL pipeline, agent flow, drift detection, reporting, and MLflow integration have been implemented. The historical reports included in the repository were generated with the mock backend and are kept only as examples of the software flow.

@@ -1,21 +1,4 @@
-"""
-Generic, config-driven ETL cleaning + monitoring pipeline.
 
-This is the dataset-agnostic version of the per-dataset Titanic scripts. It
-reads a dataset entry from `config/config.yaml` and runs the full flow:
-
-    ingest -> profile(before) -> rule-based clean -> profile(after)
-           -> data-quality metrics -> drift detection -> save reports
-           -> MLflow logging (degrades gracefully if no server)
-
-This module runs the deterministic Rule-Based half of the workflow:
-whitespace/format normalization, missing-value imputation and exact duplicate
-removal. Use `src.agents.orchestrator` for the complete agent and LLM flow.
-
-Usage:
-    python -m src.pipelines.run_pipeline --dataset adult_income
-    python -m src.pipelines.run_pipeline --dataset titanic --no-mlflow
-"""
 from __future__ import annotations
 
 import argparse
@@ -43,17 +26,11 @@ COMMON_SCHEMA = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
 def load_config(path: str = "config/config.yaml") -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-# ---------------------------------------------------------------------------
-# Layer 6.1 - Ingestion (generic)
-# ---------------------------------------------------------------------------
 def ingest(path: str, na_tokens: List[str]) -> pd.DataFrame:
     ext = os.path.splitext(path)[1].lower()
     if ext == ".csv":
@@ -64,32 +41,22 @@ def ingest(path: str, na_tokens: List[str]) -> pd.DataFrame:
         raise ValueError(f"Unsupported input format '{ext}'. Use CSV, XLSX, or XLS.")
     df.columns = [c.strip() for c in df.columns]
     df, _ = apply_schema_mapping(df, COMMON_SCHEMA)
-    # Trim surrounding whitespace on every string cell (fixes "noise" like
-    # " Bachelors" -> "Bachelors") *before* deciding what counts as missing.
+
     for c in df.columns:
         if df[c].dtype == object or pd.api.types.is_string_dtype(df[c]):
             df[c] = df[c].astype("string").str.strip()
-    # Normalize the various missing-value markers to real NaN.
     df = df.replace({t: pd.NA for t in na_tokens})
     return df
 
 
-# ---------------------------------------------------------------------------
-# Layers 6.3 + 6.7 - Rule-based validation & transformation (generic)
-# ---------------------------------------------------------------------------
 def rule_based_clean(df: pd.DataFrame) -> tuple[pd.DataFrame, Dict]:
-    """Deterministic cleaning: drop exact duplicates, impute missing values
-    (numeric -> median, categorical -> mode). Returns the cleaned frame and a
-    log describing every action, for auditability (Section 8.2)."""
     log: Dict = {"duplicates_removed": 0, "imputations": []}
     cleaned = df.copy()
 
-    # 1) Exact duplicate rows.
     dup_mask = cleaned.duplicated(keep="first")
     log["duplicates_removed"] = int(dup_mask.sum())
     cleaned = cleaned[~dup_mask].reset_index(drop=True)
 
-    # 2) Missing-value imputation.
     for col in cleaned.columns:
         missing = int(cleaned[col].isna().sum())
         if missing == 0:
@@ -111,9 +78,6 @@ def rule_based_clean(df: pd.DataFrame) -> tuple[pd.DataFrame, Dict]:
     return cleaned, log
 
 
-# ---------------------------------------------------------------------------
-# Layer 6.9 - Data-quality metrics
-# ---------------------------------------------------------------------------
 def _completeness(df: pd.DataFrame) -> float:
     total = df.size
     return 100.0 * (1 - df.isna().sum().sum() / total) if total else 100.0
@@ -140,9 +104,6 @@ def quality_metrics(before: pd.DataFrame, after: pd.DataFrame, dups_removed: int
     return result
 
 
-# ---------------------------------------------------------------------------
-# MLflow logging (graceful)
-# ---------------------------------------------------------------------------
 def log_to_mlflow(dataset: str, metrics: Dict, drift: Dict, cfg: dict,
                   report_paths: List[str]) -> bool:
     try:
@@ -164,14 +125,11 @@ def log_to_mlflow(dataset: str, metrics: Dict, drift: Dict, cfg: dict,
                 if os.path.exists(p):
                     mlflow.log_artifact(p)
         return True
-    except Exception as exc:  # pragma: no cover - depends on server availability
+    except Exception as exc:
         print(f"[pipeline] MLflow logging skipped ({type(exc).__name__}: {exc}).")
         return False
 
 
-# ---------------------------------------------------------------------------
-# Orchestration
-# ---------------------------------------------------------------------------
 def run(dataset: str, cfg: dict, use_mlflow: bool = True) -> Dict:
     ds_cfg = cfg["datasets"][dataset]
     path = ds_cfg["path"]
@@ -200,13 +158,9 @@ def run(dataset: str, cfg: dict, use_mlflow: bool = True) -> Dict:
     metrics = quality_metrics(raw, cleaned, clean_log["duplicates_removed"],
                               validation_before, validation_after)
 
-    # Drift detection (Layer 8.3): treat the data as two sequential batches
-    # (first half = reference, second half = current) — the runtime-monitoring
-    # scenario where batches arrive over time.
     mid = len(cleaned) // 2
     drift = detect_drift(cleaned.iloc[:mid], cleaned.iloc[mid:], dataset_name=dataset)
 
-    # Persist artifacts.
     os.makedirs("reports", exist_ok=True)
     os.makedirs("data/processed", exist_ok=True)
     paths = {

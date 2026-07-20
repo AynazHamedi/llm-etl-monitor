@@ -1,21 +1,5 @@
-"""
-Generates the two remaining evaluation datasets described in the proposal
-(Section 9) that do not have a single canonical downloadable file:
 
-- openml_dirty        -> "OpenML Dirty Tabular" (Schema Mismatch, Semantic Error)
-- synthetic_llmclean   -> synthetic LLMClean-style dataset (Semantic Errors, Mixed Formats)
 
-OpenML's "dirty tabular" datasets are a *category* of many different
-community-uploaded tables, not one fixed file, and the proposal's own
-"synthetic (LLMClean)" entry is explicitly generated rather than downloaded.
-So both are built here as reproducible, seeded synthetic generators that
-inject the *exact error types the proposal lists* for each dataset, which is
-more useful for testing the pipeline's routing logic than any single
-real-world file would be.
-
-Run:
-    python scripts/generate_synthetic_datasets.py
-"""
 import os
 import random
 from datetime import datetime, timedelta
@@ -30,9 +14,6 @@ np.random.seed(SEED)
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 
 
-# ---------------------------------------------------------------------------
-# Dataset 1: openml_dirty  (~2000 rows) -> Schema Mismatch, Semantic Error
-# ---------------------------------------------------------------------------
 def generate_openml_dirty(n=2000) -> pd.DataFrame:
     departments = ["Engineering", "Sales", "Marketing", "HR", "Finance", "Support"]
     countries_clean = ["USA", "Germany", "France", "Canada", "India", "Brazil"]
@@ -55,17 +36,14 @@ def generate_openml_dirty(n=2000) -> pd.DataFrame:
         dept = random.choice(departments)
         country = random.choice(countries_clean)
 
-        # --- schema mismatch: age sometimes numeric, sometimes spelled out ---
         age_val = random.randint(19, 68)
         if random.random() < 0.06:
             age_repr = {25: "twenty-five", 30: "thirty", 40: "forty"}.get(age_val, str(age_val))
         else:
             age_repr = age_val
-        # semantic error: a few impossible ages
         if random.random() < 0.02:
             age_repr = random.choice([-5, 187, 0])
 
-        # --- schema mismatch: salary as number, currency string, or with text unit ---
         base_salary = random.randint(35000, 160000)
         r = random.random()
         if r < 0.15:
@@ -75,28 +53,23 @@ def generate_openml_dirty(n=2000) -> pd.DataFrame:
         else:
             salary_repr = base_salary
 
-        # --- schema mismatch: boolean column encoded inconsistently ---
         is_mgr = random.random() < 0.2
         is_mgr_repr = random.choice(
             [str(is_mgr), "yes" if is_mgr else "no", 1 if is_mgr else 0, "TRUE" if is_mgr else "FALSE"]
         )
 
-        # --- semantic error: hire_date sometimes in the future / malformed order ---
         days_ago = random.randint(30, 6000)
         hire_date = today - timedelta(days=days_ago)
         if random.random() < 0.02:
             hire_date = today + timedelta(days=random.randint(10, 400))  # impossible future hire
         hire_date_repr = hire_date.strftime(random.choice(["%Y-%m-%d", "%d/%m/%Y", "%m-%d-%Y"]))
 
-        # --- schema mismatch: country in inconsistent forms ---
         country_repr = random.choice(country_variants[country])
 
-        # --- semantic error: email not matching name pattern, or malformed ---
         email = f"{name.split()[0].lower()}.{name.split()[1].lower()}@company.com"
         if random.random() < 0.03:
             email = name.split()[0].lower() + "AT company dot com"  # malformed
 
-        # --- semantic error: performance score outside its valid 1-10 scale ---
         score = random.randint(1, 10)
         if random.random() < 0.02:
             score = random.choice([-3, 15, 99])
@@ -116,12 +89,10 @@ def generate_openml_dirty(n=2000) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
 
-    # inject a handful of exact duplicate rows (Duplicate error type used elsewhere too)
     dup_sample = df.sample(n=max(1, n // 100), random_state=SEED)
     df = pd.concat([df, dup_sample], ignore_index=True)
 
-    # inject some missing values across a few columns (schema/semantic layer still needs
-    # baseline completeness gaps for the profiler to pick up)
+
     for col in ["salary", "country", "performance_score"]:
         idx = df.sample(frac=0.03, random_state=SEED).index
         df.loc[idx, col] = np.nan
@@ -129,9 +100,6 @@ def generate_openml_dirty(n=2000) -> pd.DataFrame:
     return df.sample(frac=1.0, random_state=SEED).reset_index(drop=True)
 
 
-# ---------------------------------------------------------------------------
-# Dataset 2: synthetic_llmclean (~1000 rows, 10 cols) -> Semantic Error, Mixed Format
-# ---------------------------------------------------------------------------
 def generate_synthetic_llmclean(n=1000) -> pd.DataFrame:
     categories = ["Electronics", "Home & Kitchen", "Books", "Toys", "Clothing", "Sports"]
     countries = ["United States", "Germany", "United Kingdom", "France", "Japan", "Australia"]
@@ -159,14 +127,11 @@ def generate_synthetic_llmclean(n=1000) -> pd.DataFrame:
             price_repr = f"{price} USD"
         else:
             price_repr = price
-        # semantic error: negative price
         if random.random() < 0.02:
             price_repr = -abs(price)
 
         quantity = random.randint(1, 5)
         status = random.choice(statuses)
-        # semantic error: cancelled/returned orders with delivered-only fields, or
-        # quantity 0 combined with a "delivered" status (logically inconsistent)
         if random.random() < 0.03:
             quantity = 0
             status = "delivered"
@@ -174,14 +139,12 @@ def generate_synthetic_llmclean(n=1000) -> pd.DataFrame:
         country = random.choice(countries)
         payment = random.choice(payment_methods)
 
-        # mixed format phone numbers
         phone_variants = [
             f"+1-{random.randint(200,999)}-{random.randint(200,999)}-{random.randint(1000,9999)}",
             f"({random.randint(200,999)}) {random.randint(200,999)}-{random.randint(1000,9999)}",
             f"{random.randint(1000000000,9999999999)}",
         ]
         phone = random.choice(phone_variants)
-        # semantic error: malformed / impossible phone number
         if random.random() < 0.02:
             phone = "N/A"
 
@@ -200,7 +163,6 @@ def generate_synthetic_llmclean(n=1000) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
 
-    # a few missing values scattered (mostly in optional-looking fields)
     for col in ["phone_number", "payment_method"]:
         idx = df.sample(frac=0.02, random_state=SEED).index
         df.loc[idx, col] = np.nan

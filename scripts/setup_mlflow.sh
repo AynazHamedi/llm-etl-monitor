@@ -1,6 +1,4 @@
 #!/bin/bash
-# Setup script for MLflow tracking server (Linux/Mac)
-# Prerequisite: pip install -r requirements.txt
 
 set -e
 

@@ -1,15 +1,4 @@
-"""
-Agent Cleaner (Section 6.5 / 7.1 / 7.3 of the proposal).
 
-"If semantic analysis is required, Agent Cleaner activates and produces
-suggested corrections." Generalizes src/llm_layer/semantic_cleaner.py
-(which was hardcoded to Titanic's `Embarked` column) into a dataset-agnostic
-few-shot prompt: build context from the *other* column values in the same
-row, restrict the answer to the column's known allowed values when the
-cardinality is low, and ask the model to self-report a confidence score
-(0-100) alongside its answer -- this confidence is what Agent Reviewer checks
-against `agents.score_confidence_threshold` in config.yaml.
-"""
 from __future__ import annotations
 
 import json
@@ -93,7 +82,7 @@ class CleanerAgent:
                     started = time.perf_counter()
                     raw = self.llm_client.generate(prompt)
                     latency_seconds = time.perf_counter() - started
-                except Exception as exc:  # network / server errors -> degrade gracefully
+                except Exception as exc:
                     trace.append({"agent": self.name, "observation": f"LLM call failed for row {idx}: {exc}"})
                     continue
 

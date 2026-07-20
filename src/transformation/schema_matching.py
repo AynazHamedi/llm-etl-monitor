@@ -1,4 +1,3 @@
-"""Lightweight, deterministic schema matching for common tabular aliases."""
 from __future__ import annotations
 
 import re

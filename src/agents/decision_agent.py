@@ -1,20 +1,3 @@
-"""
-Engine Decision (Section 6.4 / 7.1 / 7.3 of the proposal).
-
-"Based on the profiling report, Engine Decision chooses the appropriate
-processing path." The implementation is a dataset-agnostic router driven
-by column dtype + cardinality, matching the same underlying policy the
-Titanic script encoded by hand:
-
-  - numeric column, missing values      -> RULE   (median imputation)
-  - low-cardinality categorical, missing -> LLM    (semantic imputation -
-                                                     same idea as the
-                                                     Titanic `Embarked`
-                                                     example in Section 6.5)
-  - high-cardinality categorical         -> RULE / manual_review (identifiers,
-                                             free text - guessing these with
-                                             an LLM is not meaningful)
-"""
 from __future__ import annotations
 
 from typing import Dict, List, Tuple

@@ -8,17 +8,7 @@ VALID_EMBARKED_VALUES = ["S", "C", "Q"]
 
 
 class ReviewerAgent:
-    """Agent Reviewer (Section 6.6 / 7.1 / 7.3 of the proposal).
 
-    "Agent Reviewer validates the output and applies valid changes." Generic
-    version of the logic below: accepts an Agent Cleaner suggestion only if
-    (a) the confidence score is at/above `score_confidence_threshold`
-    (config/config.yaml -> agents.score_confidence_threshold) AND
-    (b) the value is within the column's allowed set, when one was provided.
-    Accepted corrections are applied in-place to the DataFrame; every
-    decision (accepted or rejected) is kept in the returned report for the
-    audit trail Section 7.2 requires.
-    """
 
     name = "Agent Reviewer"
 

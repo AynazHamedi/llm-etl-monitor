@@ -1,4 +1,3 @@
-"""Dataset-agnostic rule validation and Consistency Score (proposal 6.3/10)."""
 from __future__ import annotations
 
 import re

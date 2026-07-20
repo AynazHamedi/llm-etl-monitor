@@ -7,12 +7,7 @@ import pandas as pd
 
 
 def verified_correction_rate(review_results: List[Dict], ground_truth_path: str | None):
-    """Compare accepted corrections with manual annotations.
 
-    CSV columns: row_index,column,expected_value. Returns None when no manual
-    ground truth exists, preventing mock acceptance from being reported as
-    correction accuracy.
-    """
     if not ground_truth_path or not os.path.exists(ground_truth_path):
         return None
     truth = pd.read_csv(ground_truth_path, dtype=str)

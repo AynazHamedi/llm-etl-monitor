@@ -1,11 +1,4 @@
-"""
-Layer 6.1 - Data Ingestion
 
-Loads a raw CSV/Excel file and applies minimal, lossless standardization:
-- normalizes column names (lowercase, strip spaces)
-- infers a reasonable dtype per column
-- reports basic shape/info
-"""
 import pandas as pd
 import os
 

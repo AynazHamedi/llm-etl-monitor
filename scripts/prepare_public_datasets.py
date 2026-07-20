@@ -1,8 +1,4 @@
-"""Prepare the four datasets declared in config/config.yaml.
 
-Downloads Titanic and Adult Income from public mirrors, then invokes the
-seeded synthetic generator for the two controlled error-injection datasets.
-"""
 from __future__ import annotations
 
 import subprocess

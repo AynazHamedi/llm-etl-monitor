@@ -1,13 +1,4 @@
-"""
-Agent Profiler (Section 7.1 / 7.3 of the proposal).
 
-"Agent Profiler analyzes the data and produces a quality report in JSON
-format." Wraps the existing generic profiler (Layer 6.2,
-src/profiling/profile_data.py) and adds a ReAct-style reasoning trace so its
-decisions are auditable, as required by Section 7.2 ("all decisions and
-corrections are logged in MLflow for audit, tracking and performance
-analysis").
-"""
 from __future__ import annotations
 
 import os

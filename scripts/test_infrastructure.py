@@ -1,10 +1,4 @@
-"""
-Phase 1 infrastructure connectivity test:
-1. Is the Ollama API reachable?
-2. Is the MLflow Tracking Server reachable?
 
-Run: python scripts/test_infrastructure.py
-"""
 import sys
 import requests
 import yaml

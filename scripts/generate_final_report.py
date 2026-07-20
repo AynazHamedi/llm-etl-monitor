@@ -1,26 +1,4 @@
-"""
-Phase 6 - Final evaluation report (Section 10 of the proposal).
 
-Aggregates the per-dataset artifacts already produced by:
-    src/pipelines/run_pipeline.py     (rule-based pass:   reports/<ds>_metrics.json, _drift_report.json)
-    src/agents/orchestrator.py        (agentic pass:      reports/<ds>_agentic_metrics.json, _agentic_review.json)
-
-into one comparison table across all 4 datasets, per metric, checked against
-the success thresholds from config/config.yaml -> evaluation_thresholds
-(which mirror Section 10's table exactly).
-
-IMPORTANT: error_correction_rate is read directly from
-reports/<ds>_agentic_metrics.json (computed by orchestrator.py using the
-proposal's exact Section 10.1 formula: LLM-corrected / TOTAL semantic errors
-identified). It is NOT recomputed from the review file here, because the
-review file only contains rows that were actually sent to the LLM (capped by
-decision_engine.max_rows_per_llm_batch) - recomputing from it would silently
-conflate "acceptance rate among the sampled rows" with "correction rate over
-all identified semantic errors", which are different numbers.
-
-Run after both pipelines have been executed for every dataset:
-    python scripts/generate_final_report.py
-"""
 import json
 import os
 
@@ -69,16 +47,9 @@ def build_report():
         llm_backend = agentic_metrics.get("llm_backend", "mock (legacy report)")
         evaluation_valid = agentic_metrics.get("results_are_evaluation_valid", False)
 
-        # --- Error Correction Rate: proposal's Section 10.1 formula
-        # (LLM-corrected / TOTAL semantic errors identified), read directly
-        # from what orchestrator.py already computed and stored. ---
         error_correction_rate = agentic_metrics.get("error_correction_rate_verified")
 
-        # Secondary, non-proposal metric kept for transparency: acceptance
-        # rate ONLY among rows actually sent to the LLM (i.e. excludes the
-        # batch-cap effect). This is what a naive "accepted/len(review)"
-        # calculation over the review file would give -- shown separately so
-        # the two are never conflated.
+
         llm_batch_acceptance_rate = agentic_metrics.get("llm_batch_acceptance_rate")
         if llm_batch_acceptance_rate is None and review is not None and len(review) > 0:
             accepted = sum(1 for r in review if r["accepted"])
