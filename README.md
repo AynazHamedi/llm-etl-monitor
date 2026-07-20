@@ -31,7 +31,6 @@ The agent-based part of the project contains the following components:
 config/                 Project and dataset settings
 data/raw/               Raw datasets
 data/processed/         Cleaned output datasets
-data/ground_truth/      Manual annotations for accuracy evaluation
 reports/                Pipeline reports and evaluation results
 scripts/                Setup, preparation, and execution scripts
 src/agents/             Agents and the main orchestrator
